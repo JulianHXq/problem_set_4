@@ -1,0 +1,138 @@
+---
+title: "Problem set 4 _Alejandro Cotes"
+author: "_Alejandro Cotes"
+date: "2024-06-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# Configuración inicial
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages("rvest")
+#install.packages("dplyr")
+#install.packages("data.table")
+#install.packages("sf")
+#install.packages("ggplot2")
+#install.packages("viridis")
+#install.packages("ggspatial")
+
+library(rvest)
+library(dplyr)
+library(data.table)
+library(sf)
+library(ggplot2)
+library(viridis)
+library(ggspatial)
+library(knitr)
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+# URL de la página original
+url <- "https://eduard-martinez.github.io/pset-4.html"
+
+# Leer el contenido de la página original
+webpage <- read_html(url)
+
+# Extraer todas las URLs contenidas en los enlaces de la página original
+urls <- webpage %>% 
+  html_nodes("a") %>% 
+  html_attr("href")
+
+# Crear un objeto que almacene el vector de URLs
+url_full <- urls
+
+# Mostrar las URLs completas
+head(url_full)
+```
+
+```{r pressure, echo=FALSE}
+# Filtrar las URLs que contienen la palabra "propiedad"
+url_subset <- url_full[grepl("propiedad", url_full)]
+
+# Mostrar las URLs filtradas
+head(url_subset)
+```
+
+```{r pressure, echo=FALSE}
+# Inicializar una lista vacía para almacenar las tablas
+lista_tablas <- list()
+
+# Iterar sobre cada URL en url_subset
+for (url in url_subset) {
+  # Leer el contenido de la página
+  webpage <- read_html(url)
+  
+  # Extraer la tabla (asumimos que la tabla está presente y es la primera en la página)
+  tabla <- webpage %>% 
+    html_node("table") %>% 
+    html_table()
+  
+  # Añadir la tabla a la lista
+  lista_tablas <- append(lista_tablas, list(tabla))
+}
+
+# Convertir la lista de tablas en un único data frame
+db_house <- rbindlist(lista_tablas, fill = TRUE)
+
+# Mostrar el contenido de db_house
+head(db_house)
+```
+
+```{r pressure, echo=FALSE}
+# Convertir el data frame en un objeto SimpleFeature
+# Asumimos que db_house tiene columnas 'lon' y 'lat'
+sf_house <- st_as_sf(db_house, coords = c("lon", "lat"), crs = 4326)
+
+# Mostrar el contenido de sf_house
+print(sf_house)
+```
+
+```{r pressure, echo=FALSE}
+# Crear el mapa usando ggplot2 y ggspatial
+mapa <- ggplot(data = sf_house) +
+  annotation_map_tile("osm") +  # Añadir el mapa base de OpenStreetMap
+  geom_sf(aes(color = price), size = 2) +  # Asumimos que la columna de precios se llama 'Precio'
+  scale_color_viridis_c(option = "D") +
+  theme_minimal() +
+  labs(title = "Mapa de propiedades",
+       color = "Precio de la vivienda")
+
+# Mostrar el mapa
+print(mapa)
+
+# Exportar el mapa en formato PDF
+ggsave("mapa_propiedades.pdf", plot = mapa)
+```
+
+```{r pressure, echo=FALSE}
+summary_stats <- summary(sf_house$price)
+
+# Crear variables dummy para rooms, bedrooms, bathrooms y property_type
+sf_house$rooms <- factor(sf_house$rooms, levels = 1:12)
+sf_house$bedrooms <- factor(sf_house$bedrooms, levels = 1:12)
+sf_house$bathrooms <- factor(sf_house$bathrooms, levels = 1:10)
+sf_house$property_type <- factor(sf_house$property_type, levels = c("Casa", "Apartamento", "Depósito", "Otro"))
+
+# Ajustar el modelo de regresión lineal
+model <- lm(price ~ rooms + bedrooms + bathrooms + surface_total + surface_covered + property_type, data = sf_house)
+
+# Mostrar los resultados del modelo
+summary(model)
+
+```
+
+------------------------------------------------------------------------
+
+### Paso 3: Generar el archivo HTML
+
+1.  Guarda el archivo R-Markdown con un nombre adecuado, como `problem_set_analysis.Rmd`.
+2.  Haz clic en el botón `Knit` en la barra de herramientas de RStudio para generar el archivo HTML.
+
+Esto debería generar un archivo HTML que contiene todas las respuestas, junto con tablas y gráficos de análisis descriptivo. Si necesitas hacer ajustes o tienes preguntas adicionales, estaré encantado de ayudarte.
+
+------------------------------------------------------------------------
